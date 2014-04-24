@@ -26,8 +26,8 @@ THE SOFTWARE.
 
 ****************************************************/
 
-#ifndef _CHANNEL_H_
-#define _CHANNEL_H_
+#ifndef _LUAPROC_CHANNEL_H_
+#define _LUAPROC_CHANNEL_H_
 
 #include <pthread.h>
 

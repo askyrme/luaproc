@@ -25,8 +25,8 @@ THE SOFTWARE.
 [sched.h]
 
 ****************************************************/
-#ifndef _SCHED_H_
-#define _SCHED_H_
+#ifndef _LUAPROC_SCHED_H_
+#define _LUAPROC_SCHED_H_
 
 #include "luaproc.h"
 
