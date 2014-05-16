@@ -1,6 +1,6 @@
 ####################################################
 #
-# Copyright 2008 Alexandre Skyrme, Noemi Rodriguez, Roberto Ierusalimschy
+# Copyright 2008-2014 Alexandre Skyrme, Noemi Rodriguez, Roberto Ierusalimschy
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -27,38 +27,50 @@
 ######################################################
 
 # path to lua header files
-LUA_INC_PATH=/usr/include/lua5.1
+LUA_INCDIR=/usr/include/lua5.1
 # path to lua library
-LUA_LIB_PATH=/usr/lib/lua5.1
+LUA_LIBDIR=/usr/lib/x86_64-linux-gnu/
+# path to install library
+LUA_CPATH=/usr/share/lua/5.1
 
 # standard makefile variables
 CC=gcc
-CFLAGS=-c -Wall -fPIC -I${LUA_INC_PATH}
-LDFLAGS=-shared -L${LUA_LIB_PATH} -lpthread
-SOURCES=sched.c list.c luaproc.c channel.c
+SRCDIR=src
+BINDIR=bin
+CFLAGS=-c -O2 -Wall -fPIC -I${LUA_INCDIR}
+# MacOS X users should replace LIBFLAG with the following definition
+# LIBFLAG=-bundle -undefined dynamic_lookup
+LIBFLAG=-shared
+#
+LDFLAGS=${LIBFLAG} -L${LUA_LIBDIR} -lpthread 
+SOURCES=${SRCDIR}/lpsched.c ${SRCDIR}/luaproc.c
 OBJECTS=${SOURCES:.c=.o}
-LIB=luaproc.so
 
+# luaproc specific variables
+LIBNAME=luaproc
+LIB=${LIBNAME}.so
+
+# build targets
 all: ${SOURCES} ${LIB}
 
 ${LIB}: ${OBJECTS}
-	${CC} ${OBJECTS} -o $@ ${LDFLAGS} 
+	${CC} ${OBJECTS} -o ${BINDIR}/$@ ${LDFLAGS} 
 
-sched.o: sched.c sched.h list.h luaproc.h channel.h
-	${CC} ${CFLAGS} sched.c
+install: 
+	mkdir -p ${LUA_CPATH}/${LIBNAME} 
+	cp -v ${LIB} ${LUA_CPATH}/${LIBNAME}
 
-list.o: list.c list.h
-	${CC} ${CFLAGS} list.c
+lpsched.o: lpsched.c lpsched.h luaproc.h
+	@cd src && ${CC} ${CFLAGS} lpsched.c
 
-luaproc.o: luaproc.c luaproc.h list.h sched.h channel.h
-	${CC} ${CFLAGS} luaproc.c
-
-channel.o: channel.c channel.h list.h
-	${CC} ${CFLAGS} channel.c
+luaproc.o: luaproc.c luaproc.h lpsched.h
+	@cd src && ${CC} ${CFLAGS} luaproc.c
 
 clean:
-	rm -f ${OBJECTS} ${LIB}
+	rm -f ${OBJECTS} ${BINDIR}/${LIB}
 
-test:
-	lua test.lua
+# list targets that do not create files (but not all makes understand .PHONY)
+.PHONY: clean install
+
+# (end of Makefile)
 

@@ -1,6 +1,6 @@
 ***************************************************
 *
-* Copyright 2008 Alexandre Skyrme, Noemi Rodriguez, Roberto Ierusalimschy
+* Copyright 2014 Alexandre Skyrme, Noemi Rodriguez, Roberto Ierusalimschy
 * 
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -26,59 +26,39 @@
 *
 ****************************************************
 
-
-**************
-* PARENT API *
-**************
-
--- Create a new lua process
+-- Create a new Lua process
 -- Returns true if sucessful or nil, error_message if failed
 luaproc.newproc( <string lua_code> )
 
--- Create a new worker (pthread) 
--- Returns true if sucessful or nil, error_message if failed
-luaproc.createworker( <void> )
+-- Set the number of active workers (default = 1, min = 1)
+-- Creates/destroys workers depending on the number of active workers
+-- No return, raises error if worker(s) could not be created
+luaproc.setnumworkers( <int number_of_workers> )
 
--- Destroy a  worker (pthread) 
--- Returns true if sucessful or nil, error_message if failed
-luaproc.destroyworker( <void> )
+-- Get the number of active workers
+-- Returns the number of active workers
+luaproc.getnumworkers( <void> )
 
--- Synchronize workers (pthreads) and exit after all lua processes have ended
--- No return, finishes execution.
-luaproc.exit( <void> )
+-- Wait for all Lua processes to finish
+-- No return
+-- Obs.: It only makes sense to call this function from the main Lua script.
+--       Moreover, this function is always implicitly called when the main Lua
+--       script finishes executing.
+luaproc.wait( <void> )
 
--- Set maximum lua processes that should be recycled (default = 0)
+-- Set the maximum number of Lua processes that can be recycled (default = 0)
 -- Returns true if sucessful or nil, error_message if failed
 luaproc.recycle( <int maxrecycle> )
 
-************************************************************
-* CHILD API                                                *
-* Available only to processes spawned                      *
-* with luaproc.newproc                                     *
-************************************************************
-
--- Create a new lua process
+-- Send a message (boolean, nil, number or string) on a channel
 -- Returns true if sucessful or nil, error_message if failed
-luaproc.newproc( <string lua_code> )
+-- Blocks when there is no matching receive
+luaproc.send( <string channel_name>, <msg1>, [msg2], [msg3], ... )
 
--- Create a new worker (pthread) 
--- Returns true if sucessful or nil, error_message if failed
-luaproc.createworker( <void> )
-
--- Destroy a worker (pthread) 
--- Returns true if sucessful or nil, error_message if failed
-luaproc.destroyworker( <void> )
-
--- Send a message on a channel
--- Returns true if sucessful or nil, error_message if failed
--- Results in blocking if there is no matching receive
-luaproc.send( <string channel_name>, <string msg1>,
-				[string msg2], [string msg3], ... )
-
--- Receive a message on a channel
--- Returns message string(s) if sucessful or nil, error_message if failed
--- Results in blocking if there is no matching send
--- and the asynchronous flag is not set (nil) or set to false
+-- Receive a message (boolean, nil, number or string) on a channel
+-- Returns message(s) if sucessful or nil, error_message if failed
+-- Blocks when there is no matching send and the optional asynchronous
+-- flag is not set (nil) or set to false
 luaproc.receive( <string channel_name>, [boolean asynchronous] )
 
 -- Create a new channel
@@ -89,9 +69,6 @@ luaproc.newchannel( <string channel_name> )
 -- Returns true if sucessful or nil, error_message if failed
 luaproc.delchannel( <string channel_name> )
 
--- Set maximum lua processes that should be recycled (default = 0)
--- Returns true if sucessful or nil, error_message if failed
-luaproc.recycle( <int maxrecycle> )
-
 <> = mandatory arguments
 [] = optional arguments
+
