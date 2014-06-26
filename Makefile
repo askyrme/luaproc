@@ -58,7 +58,7 @@ ${LIB}: ${OBJECTS}
 
 install: 
 	mkdir -p ${LUA_CPATH}/${LIBNAME} 
-	cp -v ${LIB} ${LUA_CPATH}/${LIBNAME}
+	cp -v bin/${LIB} ${LUA_CPATH}/${LIBNAME}
 
 lpsched.o: lpsched.c lpsched.h luaproc.h
 	@cd src && ${CC} ${CFLAGS} lpsched.c
