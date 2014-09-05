@@ -71,7 +71,7 @@ void *workermain( void *args ) {
     }
 
     if ( destroyworkers > 0 ) {  /* check whether workers should be destroyed */
-      
+
       destroyworkers--; /* decrease workers to be destroyed count */
       workerscount--; /* decrease active workers count */
 
@@ -92,13 +92,20 @@ void *workermain( void *args ) {
     pthread_mutex_unlock( &mutex_sched );
 
     /* execute the lua code specified in the lua process struct */
-    procstat = lua_resume( luaproc_get_state( lp ), luaproc_get_numargs( lp ));
+#   if LUA_VERSION_NUM >= 502
+      procstat = lua_resume( luaproc_get_state( lp ), NULL,
+	    luaproc_get_numargs( lp ));
+#	else
+      procstat = lua_resume( luaproc_get_state( lp ),
+	    luaproc_get_numargs( lp ));
+#	endif
+
     /* reset the process argument count */
     luaproc_set_numargs( lp, 0 );
 
     /* has the lua process sucessfully finished its execution? */
     if ( procstat == 0 ) {
-      luaproc_set_status( lp, LUAPROC_STATUS_FINISHED );  
+      luaproc_set_status( lp, LUAPROC_STATUS_FINISHED );
       luaproc_recycle_insert( lp );  /* try to recycle finished lua process */
       sched_dec_lpcount();  /* decrease active lua process count */
     }
@@ -121,7 +128,7 @@ void *workermain( void *args ) {
       }
 
       /* yield on explicit coroutine.yield call */
-      else { 
+      else {
         /* re-insert the job at the end of the ready process queue */
         pthread_mutex_lock( &mutex_sched );
         list_insert( &ready_lp_list, lp );
@@ -137,7 +144,7 @@ void *workermain( void *args ) {
       lua_close( luaproc_get_state( lp ));  /* close lua state */
       sched_dec_lpcount();  /* decrease active lua process count */
     }
-  }    
+  }
 }
 
 /***********************
@@ -274,7 +281,7 @@ void sched_queue_proc( luaproc *lp ) {
 
 /* join worker threads (called when Lua exits). not joining workers causes a
    race condition since lua_close unregisters dynamic libs with dlclose and
-   thus libpthreads can be unloaded while there are workers that are still 
+   thus libpthreads can be unloaded while there are workers that are still
    alive. */
 void sched_join_workers( void ) {
 
