@@ -741,29 +741,8 @@ void luaproc_set_numargs( luaproc *lp, int n ) {
  * register structs and functions *
  **********************************/
 
-static void luaproc_reglualib( lua_State *L, const char *name,
-                               lua_CFunction f ) {
-  lua_getglobal( L, "package" );
-  lua_getfield( L, -1, "preload" );
-  lua_pushcfunction( L, f );
-  lua_setfield( L, -2, name );
-  lua_pop( L, 2 );
-}
-
 static void luaproc_openlualibs( lua_State *L ) {
-# if LUA_VERSION_NUM >= 502
-    luaL_requiref(L, "", luaopen_base, FALSE);
-    luaL_requiref(L, "package", luaopen_package, TRUE);
-# else
-    lua_cpcall( L, luaopen_base, NULL );
-    lua_cpcall( L, luaopen_package, NULL );
-# endif
-  luaproc_reglualib( L, "io", luaopen_io );
-  luaproc_reglualib( L, "os", luaopen_os );
-  luaproc_reglualib( L, "table", luaopen_table );
-  luaproc_reglualib( L, "string", luaopen_string );
-  luaproc_reglualib( L, "math", luaopen_math );
-  luaproc_reglualib( L, "debug", luaopen_debug );
+  luaL_openlibs(L);
 }
 
 LUALIB_API int luaopen_luaproc( lua_State *L ) {
