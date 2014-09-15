@@ -26,12 +26,14 @@
 #
 ######################################################
 
+# lua version
+LUA_VERSION=5.1
 # path to lua header files
-LUA_INCDIR=/usr/include/lua5.1
+LUA_INCDIR=/usr/include/lua${LUA_VERSION}
 # path to lua library
 LUA_LIBDIR=/usr/lib/x86_64-linux-gnu/
 # path to install library
-LUA_CPATH=/usr/share/lua/5.1
+LUA_CPATH=/usr/share/lua/${LUA_VERSION}
 
 # standard makefile variables
 CC=gcc
