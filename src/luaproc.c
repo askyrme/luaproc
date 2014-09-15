@@ -76,7 +76,7 @@ struct stchannel {
  ***********************/
 
 static void luaproc_openlualibs( lua_State *L );
-static const struct luaL_reg luaproc_funcs[];
+static const struct luaL_Reg luaproc_funcs[];
 
 /******************
  * list functions *
@@ -714,7 +714,7 @@ void luaproc_set_numargs( luaproc *lp, int n ) {
  **********************************/
 
 /* luaproc function registration array */
-static const struct luaL_reg luaproc_funcs[] = {
+static const struct luaL_Reg luaproc_funcs[] = {
   { "newproc", luaproc_create_newproc },
   { "wait", luaproc_wait },
   { "send", luaproc_send },
@@ -760,7 +760,8 @@ LUALIB_API int luaopen_luaproc( lua_State *L ) {
   mainlp.chan   = NULL;
   mainlp.next   = NULL;
   /* register luaproc functions */
-  luaL_register( L, "luaproc", luaproc_funcs );
+  lua_newtable( L );
+  luaL_register( L, NULL, luaproc_funcs );
   /* initialize recycle list */
   list_init( &recycle_list );
   /* initialize channels table and lua_State used to store it */
@@ -785,5 +786,5 @@ LUALIB_API int luaopen_luaproc( lua_State *L ) {
     luaL_error( L, "failed to create worker" );
   }
 
-  return 0;
+  return 1;
 }
