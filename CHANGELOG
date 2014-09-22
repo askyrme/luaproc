@@ -26,6 +26,12 @@
 *
 ****************************************************
 
+[v1.0-2]
+
+* Added macros for compatibility with Lua 5.2 and 5.3.
+
+* Removed global name registration in parent when loading luaproc.
+
 [v1.0-1]
 
 * Major code revision by Pablo Musa:

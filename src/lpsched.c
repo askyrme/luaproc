@@ -53,6 +53,12 @@ static void sched_dec_lpcount( void );
  * worker thread main function *
  *******************************/
 
+#if LUA_VERSION_NUM >= 502
+#define luaproc_resume( L, from, nargs ) lua_resume( L, from, nargs )
+#else
+#define luaproc_resume( L, from, nargs ) lua_resume( L, nargs )
+#endif
+
 /* worker thread main function */
 void *workermain( void *args ) {
 
@@ -92,7 +98,8 @@ void *workermain( void *args ) {
     pthread_mutex_unlock( &mutex_sched );
 
     /* execute the lua code specified in the lua process struct */
-    procstat = lua_resume( luaproc_get_state( lp ), luaproc_get_numargs( lp ));
+    procstat = luaproc_resume( luaproc_get_state( lp ), NULL,
+                               luaproc_get_numargs( lp ));
     /* reset the process argument count */
     luaproc_set_numargs( lp, 0 );
 

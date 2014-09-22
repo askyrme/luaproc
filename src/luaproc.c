@@ -36,9 +36,6 @@ static int recyclemax = LUAPROC_RECYCLE_MAX;
 /* lua_State used to store channel hash table */
 static lua_State *chanls = NULL;
 
-/* main state that first loaded luaproc */
-static lua_State *mainls = NULL;
-
 /* lua process used to wrap main state. this allows it to be queued in 
    channels when sending and receiving messages */
 static luaproc mainlp;
@@ -49,6 +46,20 @@ pthread_cond_t cond_mainls_sendrecv = PTHREAD_COND_INITIALIZER;
 /* main state communication mutex */
 static pthread_mutex_t mutex_mainls = PTHREAD_MUTEX_INITIALIZER;
 
+/***********************
+ * register prototypes *
+ ***********************/
+
+static void luaproc_openlualibs( lua_State *L );
+static int luaproc_create_newproc( lua_State *L );
+static int luaproc_wait( lua_State *L );
+static int luaproc_send( lua_State *L );
+static int luaproc_receive( lua_State *L );
+static int luaproc_create_channel( lua_State *L );
+static int luaproc_destroy_channel( lua_State *L );
+static int luaproc_set_numworkers( lua_State *L );
+static int luaproc_get_numworkers( lua_State *L );
+static int luaproc_recycle_set( lua_State *L );
 
 /***********
  * structs *
@@ -71,12 +82,19 @@ struct stchannel {
   pthread_cond_t can_be_used;
 };
 
-/***********************
- * register prototypes *
- ***********************/
-
-static void luaproc_openlualibs( lua_State *L );
-static const struct luaL_Reg luaproc_funcs[];
+/* luaproc function registration array */
+static const struct luaL_Reg luaproc_funcs[] = {
+  { "newproc", luaproc_create_newproc },
+  { "wait", luaproc_wait },
+  { "send", luaproc_send },
+  { "receive", luaproc_receive },
+  { "newchannel", luaproc_create_channel },
+  { "delchannel", luaproc_destroy_channel },
+  { "setnumworkers", luaproc_set_numworkers },
+  { "getnumworkers", luaproc_get_numworkers },
+  { "recycle", luaproc_recycle_set },
+  { NULL, NULL }
+};
 
 /******************
  * list functions *
@@ -313,6 +331,13 @@ static luaproc *luaproc_getself( lua_State *L ) {
   return lp;
 }
 
+#if LUA_VERSION_NUM >= 502
+#define luaproc_newlib( L, funcs ) luaL_newlib( L, funcs )
+#else
+#define luaproc_newlib( L, funcs ) \
+  lua_newtable( L ); luaL_register( L, NULL, funcs )
+#endif
+
 /* create new lua process */
 static luaproc *luaproc_new( lua_State *L ) {
 
@@ -324,7 +349,8 @@ static luaproc *luaproc_new( lua_State *L ) {
   lua_setfield( lpst, LUA_REGISTRYINDEX, "LUAPROC_LP_UDATA" );
   luaproc_openlualibs( lpst );  /* load standard libraries */
   /* register luaproc's own functions */
-  luaL_register( lpst, "luaproc", luaproc_funcs );
+  luaproc_newlib( lpst, luaproc_funcs );
+  lua_setglobal( lpst, "luaproc" );
   lp->lstate = lpst;  /* insert created lua state into lua process struct */
 
   return lp;
@@ -458,7 +484,7 @@ static int luaproc_send( lua_State *L ) {
     ret = luaproc_movevalues( L, dstlp->lstate );
     /* -1 because channel name is on the stack */
     dstlp->args = lua_gettop( dstlp->lstate ) - 1; 
-    if ( dstlp->lstate == mainls ) {
+    if ( dstlp->lstate == mainlp.lstate ) {
       /* if sending process is the parent (main) Lua state, unblock it */
       pthread_mutex_lock( &mutex_mainls );
       pthread_cond_signal( &cond_mainls_sendrecv );
@@ -477,7 +503,7 @@ static int luaproc_send( lua_State *L ) {
     }
 
   } else { 
-    if ( L == mainls ) {
+    if ( L == mainlp.lstate ) {
       /* sending process is the parent (main) Lua state - block it */
       mainlp.chan = chan;
       luaproc_queue_sender( &mainlp );
@@ -530,7 +556,7 @@ static int luaproc_receive( lua_State *L ) {
     } else {  /* nil and error_msg already in stack */
       srclp->args = 2;
     }
-    if ( srclp->lstate == mainls ) {
+    if ( srclp->lstate == mainlp.lstate ) {
       /* if sending process is the parent (main) Lua state, unblock it */
       pthread_mutex_lock( &mutex_mainls );
       pthread_cond_signal( &cond_mainls_sendrecv );
@@ -554,7 +580,7 @@ static int luaproc_receive( lua_State *L ) {
       lua_pushfstring( L, "no senders waiting on channel '%s'", chname );
       return 2;
     } else { /* synchronous receive */
-      if ( L == mainls ) {
+      if ( L == mainlp.lstate ) {
         /*  receiving process is the parent (main) Lua state - block it */
         mainlp.chan = chan;
         luaproc_queue_receiver( &mainlp );
@@ -713,20 +739,6 @@ void luaproc_set_numargs( luaproc *lp, int n ) {
  * register structs and functions *
  **********************************/
 
-/* luaproc function registration array */
-static const struct luaL_Reg luaproc_funcs[] = {
-  { "newproc", luaproc_create_newproc },
-  { "wait", luaproc_wait },
-  { "send", luaproc_send },
-  { "receive", luaproc_receive },
-  { "newchannel", luaproc_create_channel },
-  { "delchannel", luaproc_destroy_channel },
-  { "setnumworkers", luaproc_set_numworkers },
-  { "getnumworkers", luaproc_get_numworkers },
-  { "recycle", luaproc_recycle_set },
-  { NULL, NULL }
-};
-
 static void luaproc_reglualib( lua_State *L, const char *name, 
                                lua_CFunction f ) {
   lua_getglobal( L, "package" );
@@ -736,9 +748,16 @@ static void luaproc_reglualib( lua_State *L, const char *name,
   lua_pop( L, 2 );
 }
 
+#if LUA_VERSION_NUM >= 502
+#define luaproc_reqf( L, modname, f, glob ) \
+  luaL_requiref( L, modname, f, glob ); lua_pop( L, 1 )
+#else
+#define luaproc_reqf( L, modname, f, glob ) lua_cpcall( L, f, NULL )
+#endif
+
 static void luaproc_openlualibs( lua_State *L ) {
-  lua_cpcall( L, luaopen_base, NULL );
-  lua_cpcall( L, luaopen_package, NULL );
+  luaproc_reqf( L, "_G", luaopen_base, FALSE );
+  luaproc_reqf( L, "package", luaopen_package, TRUE );
   luaproc_reglualib( L, "io", luaopen_io );
   luaproc_reglualib( L, "os", luaopen_os );
   luaproc_reglualib( L, "table", luaopen_table );
@@ -751,8 +770,6 @@ LUALIB_API int luaopen_luaproc( lua_State *L ) {
 
   int init;
 
-  /* store reference to the main state */
-  mainls = L;
   /* wrap main state inside a lua process */
   mainlp.lstate = L;
   mainlp.status = LUAPROC_STATUS_IDLE;
@@ -760,8 +777,7 @@ LUALIB_API int luaopen_luaproc( lua_State *L ) {
   mainlp.chan   = NULL;
   mainlp.next   = NULL;
   /* register luaproc functions */
-  lua_newtable( L );
-  luaL_register( L, NULL, luaproc_funcs );
+  luaproc_newlib( L, luaproc_funcs );
   /* initialize recycle list */
   list_init( &recycle_list );
   /* initialize channels table and lua_State used to store it */
