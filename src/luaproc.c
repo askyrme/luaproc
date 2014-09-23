@@ -764,6 +764,12 @@ static void luaproc_openlualibs( lua_State *L ) {
   luaproc_reglualib( L, "string", luaopen_string );
   luaproc_reglualib( L, "math", luaopen_math );
   luaproc_reglualib( L, "debug", luaopen_debug );
+#if LUA_VERSION_NUM == 502
+  luaproc_reglualib( L, "bit32", luaopen_bit32 );
+#endif
+#if LUA_VERSION_NUM >= 502
+  luaproc_reglualib( L, "coroutine", luaopen_coroutine );
+#endif
 }
 
 LUALIB_API int luaopen_luaproc( lua_State *L ) {
