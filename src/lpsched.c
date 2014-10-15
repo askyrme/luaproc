@@ -328,6 +328,9 @@ void sched_join_workers( void ) {
     lua_pop( L, 1 );
   }
   lua_pop( L, 1 );
+
+  lua_close( workerls );
+  lua_close( L );
 }
 
 /* wait until there are no more active lua processes and active workers. */

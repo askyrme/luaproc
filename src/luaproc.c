@@ -102,10 +102,11 @@ static const struct luaL_Reg luaproc_funcs[] = {
 
 /* insert a lua process in a (fifo) list */
 void list_insert( list *l, luaproc *lp ) {
-  if ( l->head == NULL )
+  if ( l->head == NULL ) {
     l->head = lp;
-  else
+  } else {
     l->tail->next = lp;
+  }
   l->tail = lp;
   lp->next = NULL;
   l->nodes++;
@@ -235,12 +236,13 @@ void luaproc_recycle_insert( luaproc *lp ) {
   pthread_mutex_lock( &mutex_recycle_list );
 
   /* is recycle list full? */
-  if ( list_count( &recycle_list ) >= recyclemax )
+  if ( list_count( &recycle_list ) >= recyclemax ) {
     /* destroy state */
     lua_close( luaproc_get_state( lp ));
-  else  
+  } else {
     /* insert lua process in recycle list */
     list_insert( &recycle_list, lp );
+  }
 
   /* release exclusive access to recycled lua processes list */
   pthread_mutex_unlock( &mutex_recycle_list );
@@ -359,6 +361,7 @@ static luaproc *luaproc_new( lua_State *L ) {
 /* join schedule workers (called before exiting Lua) */
 static int luaproc_join_workers( lua_State *L ) {
   sched_join_workers();
+  lua_close( chanls );
   return 0;
 }
 
