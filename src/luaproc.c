@@ -261,22 +261,9 @@ void luaproc_queue_receiver( luaproc *lp ) {
 /********************************
  * internal auxiliary functions *
  ********************************/
-static void luaproc_loadstring( lua_State *parent, luaproc *lp,
-                                const char *code ) {
-
-  /* load lua process' lua code */
-  int ret = luaL_loadstring( lp->lstate, code );
-
-  /* in case of errors, close lua_State and push error to parent */
-  if ( ret != 0 ) {
-    lua_pushstring( parent, lua_tostring( lp->lstate, -1 ));
-    lua_close( lp->lstate );
-    luaL_error( parent, lua_tostring( parent, -1 ));
-  }
-}
 
 /* moves values between lua states' stacks */
-static int luaproc_movevalues( lua_State *Lfrom, lua_State *Lto ) {
+static int luaproc_movevalues( lua_State *Lfrom, lua_State *Lto, int offset ) {
 
   int i;
   int n = lua_gettop( Lfrom );
@@ -284,7 +271,7 @@ static int luaproc_movevalues( lua_State *Lfrom, lua_State *Lto ) {
   size_t len;
 
   /* ensure there is space in the receiver's stack */
-  if ( lua_checkstack( Lto, n ) == 0 ) {
+  if ( lua_checkstack( Lto, n - offset + 1 ) == 0 ) {
     lua_pushnil( Lto );
     lua_pushstring( Lto, "not enough space in the stack" );
     lua_pushnil( Lfrom );
@@ -293,7 +280,7 @@ static int luaproc_movevalues( lua_State *Lfrom, lua_State *Lto ) {
   }
 
   /* test each value's type and, if it's supported, move value */
-  for ( i = 2; i <= n; i++ ) {
+  for ( i = offset + 1; i <= n; i++ ) {
     switch ( lua_type( Lfrom, i )) {
       case LUA_TBOOLEAN:
         lua_pushboolean( Lto, lua_toboolean( Lfrom, i ));
@@ -430,6 +417,7 @@ static int luaproc_create_newproc( lua_State *L ) {
   /* check if first argument is a string */
   const char *code = luaL_checkstring( L, 1 );
   luaproc *lp;
+  int nargs, ret;
 
   /* get exclusive access to recycled lua processes list */
   pthread_mutex_lock( &mutex_recycle_list );
@@ -453,14 +441,42 @@ static int luaproc_create_newproc( lua_State *L ) {
   lp->args   = 0;
   lp->chan   = NULL;
 
-  /* check code syntax and set lua process ready to execute, 
+  nargs = lua_gettop( L );
+
+  /* load lua process' lua code */
+  if ( lua_toboolean( L, 2 ) ) {
+    /* load from file (`code` is the filename) */
+    ret = luaL_loadfile( lp->lstate, code );
+  } else {
+    /* load from string */
+    ret = luaL_loadstring( lp->lstate, code );
+  }
+
+  /* check code syntax and set lua process ready to execute,
      or raise an error in corresponding lua state */
-  luaproc_loadstring( L, lp, code );
+
+  if ( ret != 0 ) {
+    lua_pushstring( L, lua_tostring( lp->lstate, -1 ));
+    lua_close( lp->lstate );
+    luaL_error( L, lua_tostring( L, -1 ));
+  }
+
+  /* pass extra arguments to the process */
+  if ( ret == 0 && nargs > 2 ) {
+      ret = luaproc_movevalues( L, lp->lstate, 2 );
+      luaproc_set_numargs( lp, nargs - 2 );
+  }
+
   sched_inc_lpcount();   /* increase active lua process count */
   sched_queue_proc( lp );  /* schedule lua process for execution */
-  lua_pushboolean( L, TRUE );
 
-  return 1;
+  if (nargs > 2 && ret != TRUE) {
+    /* nil and error msg already in stack */
+    return 2;
+  } else {
+    lua_pushboolean( L, TRUE );
+    return 1;
+  }
 }
 
 /* send a message to a lua process */
@@ -484,9 +500,9 @@ static int luaproc_send( lua_State *L ) {
   
   if ( dstlp != NULL ) { /* found a receiver? */
     /* try to move values between lua states' stacks */
-    ret = luaproc_movevalues( L, dstlp->lstate );
+    ret = luaproc_movevalues( L, dstlp->lstate, 1 );
     /* -1 because channel name is on the stack */
-    dstlp->args = lua_gettop( dstlp->lstate ) - 1; 
+    dstlp->args = lua_gettop( dstlp->lstate ) - 1;
     if ( dstlp->lstate == mainlp.lstate ) {
       /* if sending process is the parent (main) Lua state, unblock it */
       pthread_mutex_lock( &mutex_mainls );
@@ -552,7 +568,7 @@ static int luaproc_receive( lua_State *L ) {
 
   if ( srclp != NULL ) {  /* found a sender? */
     /* try to move values between lua states' stacks */
-    ret = luaproc_movevalues( srclp->lstate, L );
+    ret = luaproc_movevalues( srclp->lstate, L, 1 );
     if ( ret == TRUE ) { /* was receive successful? */
       lua_pushboolean( srclp->lstate, TRUE );
       srclp->args = 1;

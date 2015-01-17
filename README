@@ -28,7 +28,7 @@
 
 -- Create a new Lua process
 -- Returns true if sucessful or nil, error_message if failed
-luaproc.newproc( <string lua_code> )
+luaproc.newproc( <string lua_code_or_file>, [boolean from_file], [arg1], ... )
 
 -- Set the number of active workers (default = 1, min = 1)
 -- Creates/destroys workers depending on the number of active workers
