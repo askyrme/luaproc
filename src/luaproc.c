@@ -261,19 +261,6 @@ void luaproc_queue_receiver( luaproc *lp ) {
 /********************************
  * internal auxiliary functions *
  ********************************/
-static void luaproc_loadstring( lua_State *parent, luaproc *lp,
-                                const char *code ) {
-
-  /* load lua process' lua code */
-  int ret = luaL_loadstring( lp->lstate, code );
-
-  /* in case of errors, close lua_State and push error to parent */
-  if ( ret != 0 ) {
-    lua_pushstring( parent, lua_tostring( lp->lstate, -1 ));
-    lua_close( lp->lstate );
-    luaL_error( parent, lua_tostring( parent, -1 ));
-  }
-}
 
 /* moves values between lua states' stacks */
 static int luaproc_movevalues( lua_State *Lfrom, lua_State *Lto ) {
@@ -430,6 +417,7 @@ static int luaproc_create_newproc( lua_State *L ) {
   /* check if first argument is a string */
   const char *code = luaL_checkstring( L, 1 );
   luaproc *lp;
+  int ret;
 
   /* get exclusive access to recycled lua processes list */
   pthread_mutex_lock( &mutex_recycle_list );
@@ -453,9 +441,24 @@ static int luaproc_create_newproc( lua_State *L ) {
   lp->args   = 0;
   lp->chan   = NULL;
 
-  /* check code syntax and set lua process ready to execute, 
+  /* load lua process' lua code */
+  if ( lua_toboolean( L, 2 ) ) {
+    /* load from file (`code` is the filename) */
+    ret = luaL_loadfile( lp->lstate, code );
+  } else {
+    /* load from string */
+    ret = luaL_loadstring( lp->lstate, code );
+  }
+
+  /* check code syntax and set lua process ready to execute,
      or raise an error in corresponding lua state */
-  luaproc_loadstring( L, lp, code );
+
+  if ( ret != 0 ) {
+    lua_pushstring( L, lua_tostring( lp->lstate, -1 ));
+    lua_close( lp->lstate );
+    luaL_error( L, lua_tostring( L, -1 ));
+  }
+
   sched_inc_lpcount();   /* increase active lua process count */
   sched_queue_proc( lp );  /* schedule lua process for execution */
   lua_pushboolean( L, TRUE );
