@@ -33,7 +33,7 @@ LUA_INCDIR=/usr/include/lua${LUA_VERSION}
 # path to lua library
 LUA_LIBDIR=/usr/lib/x86_64-linux-gnu/
 # path to install library
-LUA_CPATH=/usr/share/lua/${LUA_VERSION}
+LUA_CPATH=/usr/lib/lua/${LUA_VERSION}
 
 # standard makefile variables
 CC=gcc
@@ -59,8 +59,7 @@ ${LIB}: ${OBJECTS}
 	${CC} ${OBJECTS} -o ${BINDIR}/$@ ${LDFLAGS} 
 
 install: 
-	mkdir -p ${LUA_CPATH}/${LIBNAME} 
-	cp -v bin/${LIB} ${LUA_CPATH}/${LIBNAME}
+	cp -v bin/${LIB} ${LUA_CPATH}/
 
 lpsched.o: lpsched.c lpsched.h luaproc.h
 	@cd src && ${CC} ${CFLAGS} lpsched.c
