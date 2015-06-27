@@ -366,6 +366,38 @@ static int luaproc_join_workers( lua_State *L ) {
   return 0;
 }
 
+/* container for bytecode produced by lua_dump() */
+struct dump_collector {
+  int len;
+  int alloc_len;
+  char *code;
+};
+
+/* handle and aggregate lua_dump() bytecode output */
+static int luaproc_collect_dump( lua_State *L, const void *data,
+                                 size_t sz, void *o ) {
+
+  struct dump_collector *out = (struct dump_collector *) o;
+  /* ensure we have space for the next bytecode chunk */
+  while ( out->len + sz > out->alloc_len ) {
+    out->alloc_len <<= 1;
+    if ( out->len + sz > out->alloc_len )
+      continue;
+    o = realloc(out->code, out->alloc_len);
+    if ( o != NULL ) {
+      out->code = (char *) o;
+    } else {
+      free(out->code);
+      return LUA_ERRMEM;
+    }
+  }
+
+  /* append data to bytecode already collected */
+  memcpy(out->code + out->len, data, sz);
+  out->len += sz;
+  return 0;
+}
+
 /*********************
  * library functions *
  *********************/
@@ -425,34 +457,14 @@ static int luaproc_get_numworkers( lua_State *L ) {
   return 1;
 }
 
-struct dump_collector {
-  int len;
-  int alloc_len;
-  char *code;
-};
-
-static int luaproc_collect_dump( lua_State *L, const void *data,
-                                 size_t sz, void *o ) {
-
-  struct dump_collector *out = (struct dump_collector *) o;
-  /* ensure we have space for the next bytecode chunk */
-  while ( out->len + sz > out->alloc_len ) {
-    out->alloc_len <<= 1;
-    if ( out->len + sz > out->alloc_len )
-      continue;
-    o = realloc(out->code, out->alloc_len);
-    if ( o != NULL ) {
-      out->code = (char *) o;
-    } else {
-      free(out->code);
-      return LUA_ERRMEM;
-    }
-  }
-
-  /* append data to bytecode already collected */
-  memcpy(out->code + out->len, data, sz);
-  out->len += sz;
-  return 0;
+/* wrapper for lua_dump() */
+static int luaproc_lua_dump( lua_State *L, lua_Writer w,
+                             void *data, int strip ) {
+#if LUA_VERSION_NUM >= 503
+	return lua_dump(L, w, data, strip);
+#else
+	return lua_dump(L, w, data);
+#endif
 }
 
 /* create and schedule a new lua process */
@@ -465,7 +477,7 @@ static int luaproc_create_newproc( lua_State *L ) {
     /* if we have a function, get its bytecode */
     fdata.code = malloc(8);
     fdata.alloc_len = 8;
-    if ( lua_dump( L, &luaproc_collect_dump, &fdata ) ) {
+    if ( luaproc_lua_dump( L, &luaproc_collect_dump, &fdata, 0 ) ) {
       lua_pushstring( L, "luaproc: out of memory or invalid function" );
     lua_error( L );
    }
