@@ -8,6 +8,7 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
+#include <string.h>
 
 #include "luaproc.h"
 #include "lpsched.h"
@@ -261,11 +262,11 @@ void luaproc_queue_receiver( luaproc *lp ) {
 /********************************
  * internal auxiliary functions *
  ********************************/
-static void luaproc_loadstring( lua_State *parent, luaproc *lp,
-                                const char *code ) {
+static void luaproc_loadbuffer( lua_State *parent, luaproc *lp,
+                                const char *code, size_t sz ) {
 
   /* load lua process' lua code */
-  int ret = luaL_loadstring( lp->lstate, code );
+  int ret = luaL_loadbuffer( lp->lstate, code, sz, "luaproc_fn" );
 
   /* in case of errors, close lua_State and push error to parent */
   if ( ret != 0 ) {
@@ -365,6 +366,38 @@ static int luaproc_join_workers( lua_State *L ) {
   return 0;
 }
 
+/* container for bytecode produced by lua_dump() */
+struct dump_collector {
+  int len;
+  int alloc_len;
+  char *code;
+};
+
+/* handle and aggregate lua_dump() bytecode output */
+static int luaproc_collect_dump( lua_State *L, const void *data,
+                                 size_t sz, void *o ) {
+
+  struct dump_collector *out = (struct dump_collector *) o;
+  /* ensure we have space for the next bytecode chunk */
+  while ( out->len + sz > out->alloc_len ) {
+    out->alloc_len <<= 1;
+    if ( out->len + sz > out->alloc_len )
+      continue;
+    o = realloc( out->code, out->alloc_len );
+    if ( o != NULL ) {
+      out->code = (char *) o;
+    } else {
+      free( out->code );
+      return LUA_ERRMEM;
+    }
+  }
+
+  /* append data to bytecode already collected */
+  memcpy( out->code + out->len, data, sz );
+  out->len += sz;
+  return 0;
+}
+
 /*********************
  * library functions *
  *********************/
@@ -424,12 +457,34 @@ static int luaproc_get_numworkers( lua_State *L ) {
   return 1;
 }
 
+/* wrapper for lua_dump() */
+static int luaproc_lua_dump( lua_State *L, lua_Writer w,
+                             void *data, int strip ) {
+#if LUA_VERSION_NUM >= 503
+  return lua_dump( L, w, data, strip );
+#else
+  return lua_dump( L, w, data );
+#endif
+}
+
 /* create and schedule a new lua process */
 static int luaproc_create_newproc( lua_State *L ) {
 
-  /* check if first argument is a string */
-  const char *code = luaL_checkstring( L, 1 );
+  /* check if first argument is a function or a string */
   luaproc *lp;
+  struct dump_collector fdata = { 0, 0, NULL };
+  if ( lua_isfunction( L, 1 ) ) {
+    /* if we have a function, get its bytecode */
+    fdata.code = malloc(8);
+    fdata.alloc_len = 8;
+    if ( luaproc_lua_dump( L, &luaproc_collect_dump, &fdata, 0 ) ) {
+      lua_pushstring( L, "luaproc: out of memory or invalid function" );
+      lua_error( L );
+    }
+  } else {
+    fdata.code = (char *) luaL_checkstring( L, 1 );
+    fdata.len = strlen( fdata.code );
+  }
 
   /* get exclusive access to recycled lua processes list */
   pthread_mutex_lock( &mutex_recycle_list );
@@ -455,10 +510,13 @@ static int luaproc_create_newproc( lua_State *L ) {
 
   /* check code syntax and set lua process ready to execute, 
      or raise an error in corresponding lua state */
-  luaproc_loadstring( L, lp, code );
+  luaproc_loadbuffer( L, lp, fdata.code, fdata.len );
   sched_inc_lpcount();   /* increase active lua process count */
   sched_queue_proc( lp );  /* schedule lua process for execution */
   lua_pushboolean( L, TRUE );
+
+  if ( fdata.alloc_len != 0 )
+    free( fdata.code );
 
   return 1;
 }

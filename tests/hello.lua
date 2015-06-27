@@ -5,7 +5,7 @@ luaproc = require "luaproc"
 luaproc.setnumworkers( 2 )
 
 -- create a new lua process
-luaproc.newproc( [[
+luaproc.newproc( function ()
   -- create a communication channel
   luaproc.newchannel( "achannel" )
   -- create a sender lua process
@@ -18,5 +18,5 @@ luaproc.newproc( [[
     -- receive and print a message
     print( luaproc.receive( "achannel" ))
   ]=] )
-]] )
+end )
 
