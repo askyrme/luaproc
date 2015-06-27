@@ -479,8 +479,8 @@ static int luaproc_create_newproc( lua_State *L ) {
     fdata.alloc_len = 8;
     if ( luaproc_lua_dump( L, &luaproc_collect_dump, &fdata, 0 ) ) {
       lua_pushstring( L, "luaproc: out of memory or invalid function" );
-    lua_error( L );
-   }
+      lua_error( L );
+    }
   } else {
     fdata.code = (char *) luaL_checkstring( L, 1 );
     fdata.len = strlen( fdata.code );
