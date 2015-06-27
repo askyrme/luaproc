@@ -461,9 +461,9 @@ static int luaproc_get_numworkers( lua_State *L ) {
 static int luaproc_lua_dump( lua_State *L, lua_Writer w,
                              void *data, int strip ) {
 #if LUA_VERSION_NUM >= 503
-	return lua_dump(L, w, data, strip);
+  return lua_dump(L, w, data, strip);
 #else
-	return lua_dump(L, w, data);
+  return lua_dump(L, w, data);
 #endif
 }
 
