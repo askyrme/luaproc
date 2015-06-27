@@ -383,17 +383,17 @@ static int luaproc_collect_dump( lua_State *L, const void *data,
     out->alloc_len <<= 1;
     if ( out->len + sz > out->alloc_len )
       continue;
-    o = realloc(out->code, out->alloc_len);
+    o = realloc( out->code, out->alloc_len );
     if ( o != NULL ) {
       out->code = (char *) o;
     } else {
-      free(out->code);
+      free( out->code );
       return LUA_ERRMEM;
     }
   }
 
   /* append data to bytecode already collected */
-  memcpy(out->code + out->len, data, sz);
+  memcpy( out->code + out->len, data, sz );
   out->len += sz;
   return 0;
 }
@@ -461,9 +461,9 @@ static int luaproc_get_numworkers( lua_State *L ) {
 static int luaproc_lua_dump( lua_State *L, lua_Writer w,
                              void *data, int strip ) {
 #if LUA_VERSION_NUM >= 503
-  return lua_dump(L, w, data, strip);
+  return lua_dump( L, w, data, strip );
 #else
-  return lua_dump(L, w, data);
+  return lua_dump( L, w, data );
 #endif
 }
 
@@ -516,7 +516,7 @@ static int luaproc_create_newproc( lua_State *L ) {
   lua_pushboolean( L, TRUE );
 
   if ( fdata.alloc_len != 0 )
-    free(fdata.code);
+    free( fdata.code );
 
   return 1;
 }
