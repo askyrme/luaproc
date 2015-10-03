@@ -49,6 +49,7 @@ a new state.
 ## API
 
 **`luaproc.newproc( string lua_code )`**
+
 **`luaproc.newproc( function f )`**
 
 Creates a new Lua process to run the specified string of Lua code or the
