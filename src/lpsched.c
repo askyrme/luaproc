@@ -17,6 +17,12 @@
 #define TRUE  !FALSE
 #define LUAPROC_SCHED_WORKERS_TABLE "workertb"
 
+#if (LUA_VERSION_NUM >= 502)
+#define luaproc_resume( L, from, nargs ) lua_resume( L, from, nargs )
+#else
+#define luaproc_resume( L, from, nargs ) lua_resume( L, nargs )
+#endif
+
 /********************
  * global variables *
  *******************/
@@ -52,12 +58,6 @@ static void sched_dec_lpcount( void );
 /*******************************
  * worker thread main function *
  *******************************/
-
-#if LUA_VERSION_NUM >= 502
-#define luaproc_resume( L, from, nargs ) lua_resume( L, from, nargs )
-#else
-#define luaproc_resume( L, from, nargs ) lua_resume( L, nargs )
-#endif
 
 /* worker thread main function */
 void *workermain( void *args ) {

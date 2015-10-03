@@ -81,7 +81,7 @@ int list_count( list *l );
 
 
 /******************************************************************************
-* Copyright 2008-2013 Alexandre Skyrme, Noemi Rodriguez, Roberto Ierusalimschy
+* Copyright 2008-2015 Alexandre Skyrme, Noemi Rodriguez, Roberto Ierusalimschy
 *
 * Permission is hereby granted, free of charge, to any person obtaining
 * a copy of this software and associated documentation files (the

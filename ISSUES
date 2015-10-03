@@ -1,0 +1,26 @@
+*** ISSUES ***
+
+Using luaproc together with luasocket can result in segmentation faults.
+Apparently that is caused neither by bugs in luaproc, nor in luasocket, but
+rather by the concurrent execution of some glibc functions that are called by
+Lua when these libraries are used. Since the Lua interpreter binary is not
+linked to pthreads, memory management is not handled properly by glibc and leads
+to corruption.
+ 
+There are at least two possible workarounds:
+
+1 - Pre-load (LD_PRELOAD) pthreads when executing the Lua interpreter to run the
+script that uses luaproc and luasocket. 
+
+2 - Compile a Lua interpreter binary that is linked to pthreads.
+
+In particular, we observed this issue is likely to happen when the getaddrinfo
+glibc function is called from luasocket functions being executed within Lua
+processes. Hence, another possible workaround would be to not resolve hostnames
+within Lua processes but rather (a) use IP addresses or (b) have the main Lua
+script resolve hostnames and send the corresponding IP addresses to Lua
+processes via message passing.
+
+For an old report that was helpful to understand this issue, check:
+https://sourceware.org/bugzilla/show_bug.cgi?id=10652.
+
