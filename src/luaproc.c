@@ -59,8 +59,17 @@
 
 #if (LUA_VERSION_NUM >= 503)
 #define dump( L, writer, data, strip )     lua_dump( L, writer, data, strip )
+#define copynumber( Lto, Lfrom, i ) {\
+  if ( lua_isinteger( Lfrom, i )) {\
+    lua_pushinteger( Lto, lua_tonumber( Lfrom, i ));\
+  } else {\
+    lua_pushnumber( Lto, lua_tonumber( Lfrom, i ));\
+  }\
+}
 #else
 #define dump( L, writer, data, strip )     lua_dump( L, writer, data )
+#define copynumber( Lto, Lfrom, i ) \
+  lua_pushnumber( Lto, lua_tonumber( Lfrom, i ))
 #endif
 
 /********************
@@ -347,7 +356,7 @@ static int luaproc_copyvalues( lua_State *Lfrom, lua_State *Lto ) {
         lua_pushboolean( Lto, lua_toboolean( Lfrom, i ));
         break;
       case LUA_TNUMBER:
-        lua_pushnumber( Lto, lua_tonumber( Lfrom, i ));
+        copynumber( Lto, Lfrom, i );
         break;
       case LUA_TSTRING: {
         str = lua_tolstring( Lfrom, i, &len );
@@ -430,7 +439,7 @@ static int luaproc_copyupvalues( lua_State *Lfrom, lua_State *Lto,
         lua_pushboolean( Lto, lua_toboolean( Lfrom, -1 ));
         break;
       case LUA_TNUMBER:
-        lua_pushnumber( Lto, lua_tonumber( Lfrom, -1 ));
+        copynumber( Lto, Lfrom, -1 );
         break;
       case LUA_TSTRING: {
         str = lua_tolstring( Lfrom, -1, &len );

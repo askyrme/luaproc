@@ -1,5 +1,8 @@
 *** CHANGELOG ***
 
+* Fixed send/receive to handle integers and floats properly in Lua 5.3. Bug 
+reported by luafox.
+
 [v1.0-4]
 
 * Changed luaproc.newproc to be able to receive a Lua function as an argument.

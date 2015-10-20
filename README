@@ -46,6 +46,10 @@ them. When recycling is enabled, a new Lua process can be created by loading its
 code in a previously used state from a finished Lua process, instead of creating
 a new state. 
 
+## Compatibility
+
+luaproc is compatible with Lua 5.1, 5.2 and 5.3.
+
 ## API
 
 `luaproc.newproc( string lua_code )`
