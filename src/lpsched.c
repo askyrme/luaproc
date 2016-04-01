@@ -62,7 +62,7 @@ static void add_thread(lua_State * L, pthread_t thread)
 #if defined(_MSC_VER)
 	*(pthread_t *)lua_newuserdata(L, sizeof(pthread_t)) = thread;
 #else
-	lua_pushlightuserdata(L, (void *)t);
+	lua_pushlightuserdata(L, (void *)thread);
 #endif
 }
 
