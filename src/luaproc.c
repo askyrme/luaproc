@@ -72,6 +72,27 @@
   lua_pushnumber( Lto, lua_tonumber( Lfrom, i ))
 #endif
 
+/***********
+ * structs *
+ ***********/
+
+/* lua process */
+struct stluaproc {
+  lua_State *lstate;
+  int status;
+  int args;
+  channel *chan;
+  luaproc *next;
+};
+
+/* communication channel */
+struct stchannel {
+  list send;
+  list recv;
+  pthread_mutex_t mutex;
+  pthread_cond_t can_be_used;
+};
+
 /********************
  * global variables *
  *******************/
@@ -121,23 +142,6 @@ static int luaproc_loadlib( lua_State *L );
 /***********
  * structs *
  ***********/
-
-/* lua process */
-struct stluaproc {
-  lua_State *lstate;
-  int status;
-  int args;
-  channel *chan;
-  luaproc *next;
-};
-
-/* communication channel */
-struct stchannel {
-  list send;
-  list recv;
-  pthread_mutex_t mutex;
-  pthread_cond_t can_be_used;
-};
 
 /* luaproc function registration array */
 static const struct luaL_Reg luaproc_funcs[] = {

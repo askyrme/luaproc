@@ -55,6 +55,26 @@ int destroyworkers = 0;  /* number of workers to destroy */
 
 static void sched_dec_lpcount( void );
 
+// Stuff to accommodate pthreads-win32: http://sourceware.org/pthreads-win32/index.html
+
+static void add_thread(lua_State * L, pthread_t thread)
+{
+#if defined(_MSC_VER)
+	*(pthread_t *)lua_newuserdata(L, sizeof(pthread_t)) = thread;
+#else
+	lua_pushlightuserdata(L, (void *)thread);
+#endif
+}
+
+static pthread_t get_thread(lua_State * L, int index)
+{
+#if defined(_MSC_VER)
+	return *(pthread_t *)lua_touserdata(L, index);
+#else
+	return (pthread_t)lua_touserdata(L, index);
+#endif
+}
+
 /*******************************
  * worker thread main function *
  *******************************/
@@ -83,7 +103,10 @@ void *workermain( void *args ) {
 
       /* remove worker from workers table */
       lua_getglobal( workerls, LUAPROC_SCHED_WORKERS_TABLE );
-      lua_pushlightuserdata( workerls, (void *)pthread_self( ));
+// STEVE CHANGE
+//    lua_pushlightuserdata( workerls, (void *)pthread_self() );
+      add_thread(workerls, pthread_self());
+// /STEVE CHANGE
       lua_pushnil( workerls );
       lua_rawset( workerls, -3 );
       lua_pop( workerls, 1 );
@@ -199,7 +222,8 @@ int sched_init( void ) {
     }
 
     /* store worker thread id in a table */
-    lua_pushlightuserdata( workerls, (void *)worker );
+//  lua_pushlightuserdata( workerls, (void *)worker );
+    add_thread(workerls, worker);
     lua_pushboolean( workerls, TRUE );
     lua_rawset( workerls, -3 );
 
@@ -238,7 +262,8 @@ int sched_set_numworkers( int numworkers ) {
       }
 
       /* store worker thread id in a table */
-      lua_pushlightuserdata( workerls, (void *)worker );
+//    lua_pushlightuserdata( workerls, (void *)worker );
+      add_thread(workerls, worker);
       lua_pushboolean( workerls, TRUE );
       lua_rawset( workerls, -3 );
 
@@ -323,7 +348,8 @@ void sched_join_workers( void ) {
   lua_getglobal( L, wtb );
   lua_pushnil( L );
   while ( lua_next( L, -2 ) != 0 ) {
-    pthread_join(( pthread_t )lua_touserdata( L, -2 ), NULL );
+//  pthread_join(( pthread_t )lua_touserdata( L, -2 ), NULL );
+    pthread_join(get_thread(L, -2), NULL);
     /* pop value, leave key for next iteration */
     lua_pop( L, 1 );
   }
