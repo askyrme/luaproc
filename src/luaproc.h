@@ -6,6 +6,13 @@
 #ifndef _LUA_LUAPROC_H_
 #define _LUA_LUAPROC_H_
 
+
+/*************************************
+ * thread macro
+ ************************************/
+#define LUAPROC_USE_PTHREADS
+
+
 /*************************************
  * execution status of lua processes *
  ************************************/
