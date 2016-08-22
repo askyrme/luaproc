@@ -3,8 +3,10 @@
 ** See Copyright Notice in luaproc.h
 */
 
-#include <stdio.h>
+#ifdef LUAPROC_USE_PTHREADS
 #include <stdlib.h>
+#include <stdio.h>
+#endif
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
@@ -13,8 +15,10 @@
 #include "luaproc.h"
 #include "lpthread.h"
 
+#if defined(LUAPROC_USE_PTHREADS) || defined(__linux__)
 #define FALSE 0
 #define TRUE  !FALSE
+#endif
 #define LUAPROC_SCHED_WORKERS_TABLE "workertb"
 
 #if (LUA_VERSION_NUM >= 502)
@@ -60,7 +64,14 @@ static void sched_dec_lpcount( void );
  *******************************/
 
 /* worker thread main function */
-void *workermain( void *args ) {
+#ifndef LUAPROC_USE_KTHREADS
+void*
+#elif defined(__NetBSD__)
+void
+#elif defined(__linux__)
+int
+#endif
+workermain( void *args ) {
 
   luaproc *lp;
   int procstat;
@@ -83,14 +94,22 @@ void *workermain( void *args ) {
 
       /* remove worker from workers table */
       lua_getglobal( workerls, LUAPROC_SCHED_WORKERS_TABLE );
-      lua_pushlightuserdata( workerls, (void *)pthread_self( ));
+#ifndef LUAPROC_USE_KTHREADS
+      lua_pushlightuserdata( workerls, (void *)lpthread_self( ));
+#else
+      lua_pushlightuserdata( workerls, (void *)lpthread_self);
+#endif
       lua_pushnil( workerls );
       lua_rawset( workerls, -3 );
       lua_pop( workerls, 1 );
 
       lpthread_cond_signal( &cond_wakeup_worker );  /* wake other workers up */
       lpthread_mutex_unlock( &mutex_sched );
+#ifndef LUAPROC_USE_KTHREADS
       lpthread_exit( NULL );  /* destroy itself */
+#else
+      lpthread_exit( 0 );
+#endif
     }
 
     /* remove lua process from the ready queue */
@@ -139,7 +158,7 @@ void *workermain( void *args ) {
     /* or was there an error executing the lua process? */
     else {
       /* print error message */
-      fprintf( stderr, "close lua_State (error: %s)\n",
+      printf("close lua_State (error: %s)\n",
                luaL_checkstring( luaproc_get_state( lp ), -1 ));
       lua_close( luaproc_get_state( lp ));  /* close lua state */
       sched_dec_lpcount();  /* decrease active lua process count */
@@ -174,11 +193,15 @@ void sched_inc_lpcount( void ) {
 }
 
 /* local scheduler initialization */
-int sched_init( void ) {
+int luaproc_sched_init( void ) {
 
   int i;
+#if defined(_KERNEL) && defined(__NetBSD__)
+  lpthread_t *worker;
+#else
   lpthread_t worker;
-  
+#endif
+
   /*globals initialization*/
   lpthread_mutex_init( &mutex_sched, NULL );
   lpthread_mutex_init( &mutex_lp_count, NULL );
@@ -199,10 +222,18 @@ int sched_init( void ) {
   /* create default number of initial worker threads */
   for ( i = 0; i < LUAPROC_SCHED_DEFAULT_WORKER_THREADS; i++ ) {
 
+#if defined(__NetBSD__) || defined(LUAPROC_USE_PTHREADS)
     if ( lpthread_create( &worker, NULL, workermain, NULL ) != 0 ) {
       lua_pop( workerls, 1 ); /* pop workers table from stack */
       return LUAPROC_SCHED_PTHREAD_ERROR;
     }
+#elif defined(__linux__) && defined(_KERNEL)
+    worker = lpthread_create( workermain, NULL, workerscount );
+    if ( IS_ERR( worker ) ) {
+      lua_pop( workerls, 1 ); /* pop workers table from stack */
+      return LUAPROC_SCHED_PTHREAD_ERROR;
+    }
+#endif
 
     /* store worker thread id in a table */
     lua_pushlightuserdata( workerls, (void *)worker );
@@ -221,7 +252,11 @@ int sched_init( void ) {
 int sched_set_numworkers( int numworkers ) {
 
   int i, delta;
+#if defined(_KERNEL) && defined(__NetBSD__)
+  lpthread_t *worker;
+#else
   lpthread_t worker;
+#endif
 
   lpthread_mutex_lock( &mutex_sched );
 
@@ -237,11 +272,21 @@ int sched_set_numworkers( int numworkers ) {
     /* create additional workers */
     for ( i = 0; i < delta; i++ ) {
 
+#if defined(__NetBSD__) || defined(LUAPROC_USE_PTHREADS)
       if ( lpthread_create( &worker, NULL, workermain, NULL ) != 0 ) {
         lpthread_mutex_unlock( &mutex_sched );
         lua_pop( workerls, 1 ); /* pop workers table from stack */
         return LUAPROC_SCHED_PTHREAD_ERROR;
       }
+
+#elif defined(__linux__) && defined(_KERNEL)
+      worker = lpthread_create( workermain, NULL, workerscount );
+      if ( IS_ERR( worker ) ) {
+        lpthread_mutex_unlock( &mutex_sched );
+        lua_pop( workerls, 1 ); /* pop workers table from stack */
+        return LUAPROC_SCHED_PTHREAD_ERROR;
+      }
+#endif
 
       /* store worker thread id in a table */
       lua_pushlightuserdata( workerls, (void *)worker );
@@ -329,7 +374,11 @@ void sched_join_workers( void ) {
   lua_getglobal( L, wtb );
   lua_pushnil( L );
   while ( lua_next( L, -2 ) != 0 ) {
+#if defined(LUAPROC_USE_PTHREADS) || (defined(__linux__))
     lpthread_join(( lpthread_t )lua_touserdata( L, -2 ), NULL );
+#else
+    lpthread_join(( lpthread_t *)lua_touserdata( L, 2 ), NULL );
+#endif
     /* pop value, leave key for next iteration */
     lua_pop( L, 1 );
   }
