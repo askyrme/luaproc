@@ -20,47 +20,10 @@
 #define LUAPROC_CHANNELS_TABLE "channeltb"
 #define LUAPROC_RECYCLE_MAX 0
 
-#if (LUA_VERSION_NUM == 501)
-
-#define lua_pushglobaltable( L )    lua_pushvalue( L, LUA_GLOBALSINDEX )
-#define luaL_newlib( L, funcs )     { lua_newtable( L ); \
-  luaL_register( L, NULL, funcs ); }
-#define isequal( L, a, b )          lua_equal( L, a, b )
-#define requiref( L, modname, f, glob ) {\
-  lua_pushcfunction( L, f ); /* push module load function */ \
-  lua_pushstring( L, modname );  /* argument to module load function */ \
-  lua_call( L, 1, 1 );  /* call 'f' to load module */ \
-  /* register module in package.loaded table in case 'f' doesn't do so */ \
-  lua_getfield( L, LUA_GLOBALSINDEX, LUA_LOADLIBNAME );\
-  if ( lua_type( L, -1 ) == LUA_TTABLE ) {\
-    lua_getfield( L, -1, "loaded" );\
-    if ( lua_type( L, -1 ) == LUA_TTABLE ) {\
-      lua_getfield( L, -1, modname );\
-      if ( lua_type( L, -1 ) == LUA_TNIL ) {\
-        lua_pushvalue( L, 1 );\
-        lua_setfield( L, -3, modname );\
-      }\
-      lua_pop( L, 1 );\
-    }\
-    lua_pop( L, 1 );\
-  }\
-  lua_pop( L, 1 );\
-  if ( glob ) { /* set global name? */ \
-    lua_setglobal( L, modname );\
-  } else {\
-    lua_pop( L, 1 );\
-  }\
-}
-
-#else
-
 #define isequal( L, a, b )                 lua_compare( L, a, b, LUA_OPEQ )
 #define requiref( L, modname, f, glob ) \
   { luaL_requiref( L, modname, f, glob ); lua_pop( L, 1 ); }
 
-#endif
-
-#if (LUA_VERSION_NUM >= 503)
 #define dump( L, writer, data, strip )     lua_dump( L, writer, data, strip )
 #define copynumber( Lto, Lfrom, i ) {\
   if ( lua_isinteger( Lfrom, i )) {\
@@ -69,11 +32,7 @@
     lua_pushnumber( Lto, lua_tonumber( Lfrom, i ));\
   }\
 }
-#else
-#define dump( L, writer, data, strip )     lua_dump( L, writer, data )
-#define copynumber( Lto, Lfrom, i ) \
-  lua_pushnumber( Lto, lua_tonumber( Lfrom, i ))
-#endif
+
 #if defined(LUAPROC_USE_KTHREADS) && defined(__NetBSD__)
 #ifdef _MODULE
 MODULE(MODULE_CLASS_MISC, luaproc, "lua");

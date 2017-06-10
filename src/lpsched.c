@@ -21,11 +21,7 @@
 #endif
 #define LUAPROC_SCHED_WORKERS_TABLE "workertb"
 
-#if (LUA_VERSION_NUM >= 502)
 #define luaproc_resume( L, from, nargs ) lua_resume( L, from, nargs )
-#else
-#define luaproc_resume( L, from, nargs ) lua_resume( L, nargs )
-#endif
 
 /********************
  * global variables *
