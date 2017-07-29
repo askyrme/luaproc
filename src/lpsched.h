@@ -27,8 +27,16 @@
  * function prototypes *
  **********************/
 
+#ifndef LUAPROC_USE_KTHREADS
+void*
+#elif defined(__NetBSD__)
+void
+#elif defined(__linux__)
+int
+#endif
+workermain( void* args );
 /* initialize scheduler */
-int sched_init( void );
+int luaproc_sched_init( void );
 /* join workers */
 void sched_join_workers( void );
 /* wait until there are no more active lua processes */
@@ -41,5 +49,4 @@ void sched_inc_lpcount( void );
 int sched_set_numworkers( int numworkers );
 /* return the number of active workers */
 int sched_get_numworkers( void );
-
 #endif
